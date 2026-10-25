@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ProjectPilot AI</title>
+<style>
+:root{--bg:#f3f5f2;--sf:#fff;--tx:#17211d;--mu:#5d6b65;--ln:#d5dcd7;--ac:#0f6b57;--hi:#c0392b;--md:#b7791f;--lo:#2f855a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root:not([data-theme="light"]){color-scheme:light dark}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101613;--sf:#18211d;--tx:#e8efeb;--mu:#93a39b;--ln:#2b3a33;--ac:#4cc3a3;--hi:#ef7a6b;--md:#e0a94a;--lo:#5fc58d}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+.w{max-width:1000px;margin:0 auto;padding:16px}
+h1{font:600 24px/1.2 "IBM Plex Sans",system-ui,sans-serif;margin:0}h2{font-size:17px;margin:0 0 8px}
+.sub{color:var(--mu);margin:2px 0 14px}
+nav{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--ln);margin-bottom:14px}
+nav button{background:none;border:0;border-bottom:3px solid transparent;color:var(--mu);padding:9px 12px;font:inherit;cursor:pointer;white-space:nowrap}
+nav button.on{color:var(--tx);border-color:var(--ac);font-weight:600}
+.c{background:var(--sf);border:1px solid var(--ln);border-radius:6px;padding:14px;margin-bottom:12px}
+.g{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+label{display:block;font-size:13px;color:var(--mu)}
+input,textarea,select{width:100%;font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--ln);border-radius:4px;padding:7px}
+textarea{min-height:64px}
+button.p{background:var(--ac);color:var(--bg);border:0;border-radius:4px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer}
+button.s{background:none;border:1px solid var(--ln);color:var(--tx);border-radius:4px;padding:4px 9px;font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.k b{display:block;font-size:26px;line-height:1.1}.k span{color:var(--mu);font-size:13px}
+.sc{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--ln);font-size:14px;vertical-align:middle}th{color:var(--mu);font-weight:500}
+.b{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600;border:1px solid currentColor}
+.High{color:var(--hi)}.Medium{color:var(--md)}.Low{color:var(--lo)}
+.gt{position:relative;min-width:640px}.gr{display:flex;align-items:center;height:26px}
+.gl{width:150px;font-size:12px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gb{position:relative;flex:1;height:100%}.bar{position:absolute;top:5px;height:16px;border-radius:3px;background:var(--ac);opacity:.85}
+.bar.cr{background:var(--hi)}.bar i{display:block;height:100%;background:#0006;border-radius:3px}
+.td{position:absolute;top:0;bottom:0;width:2px;background:var(--md)}
+.rec{display:flex;gap:10px;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--ln)}
+.rec:last-child{border:0}.rec small{color:var(--mu);display:block}
+.mt{color:var(--mu);font-size:13px}ul{padding-left:20px;margin:6px 0}
+</style></head><body><div class="w">
+<h1>ProjectPilot AI</h1>
+<p class="sub">Plan a project from a description, schedule it, predict delays, and review AI recommendations before anything changes.</p>
+<nav id="nav"></nav><main id="v"></main></div>
+<script>
+const TPL={
+software:{k:/app|web|software|portal|website|system|platform|api|dashboard/i,t:[["Requirements",4,[],"plan"],["UI design",5,[0],"design"],["Data model",3,[0],"data"],["Backend build",8,[2],"dev"],["Frontend build",7,[1],"dev"],["Integration",4,[3,4],"dev"],["Testing",5,[5],"test"],["Documentation",3,[5],"ops"],["Deployment",2,[6,7],"ops"]]},
+event:{k:/event|conference|wedding|festival|launch party|fest/i,t:[["Goals and budget",3,[],"plan"],["Venue and dates",4,[0],"ops"],["Speakers and vendors",6,[0],"plan"],["Branding and invites",5,[1],"design"],["Registration setup",4,[1],"data"],["Logistics rehearsal",3,[2,3,4],"ops"],["Event day",1,[5],"ops"],["Feedback report",3,[6],"data"]]},
+general:{k:/./,t:[["Define scope",3,[],"plan"],["Research",4,[0],"data"],["Design the approach",5,[1],"design"],["Build or execute",8,[2],"dev"],["Review and test",3,[3],"test"],["Handover",2,[4],"ops"]]}};
+let S={name:"Customer Portal Redesign",desc:"Build a web portal where customers track orders and raise support tickets",deadline:40,budget:30000,rate:400,today:10,
+team:[{n:"Asha",s:["plan","design"],l:30},{n:"Ravi",s:["dev","data"],l:55},{n:"Meera",s:["test","data","dev"],l:40},{n:"Kabir",s:["ops","plan"],l:20}],
+tasks:[],recs:[],log:[],tab:"plan",ex:{}};
+const $=s=>document.querySelector(s),esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function plan(){let key=Object.keys(TPL).find(k=>TPL[k].k.test(S.desc+" "+S.name));
+ S.tasks=TPL[key].t.map((t,i)=>({id:i,name:t[0],dur:t[1],dep:t[2],sk:t[3],own:null,pr:0}));
+ assign();S.recs=[];S.log=[];S.tpl=key}
+function assign(){const ld={};S.team.forEach(m=>ld[m.n]=m.l);
+ S.tasks.forEach(t=>{if(t.lock)return;let c=S.team.map(m=>({m,sc:(m.s.includes(t.sk)?0:40)+ld[m.n]}));c.sort((a,b)=>a.sc-b.sc);t.own=c[0].m.n;ld[t.own]+=t.dur*2})}
+function sched(){const T=S.tasks;T.forEach(t=>{t.es=Math.max(0,...t.dep.map(d=>T[d].es+T[d].dur));t.ef=t.es+t.dur});
+ const end=Math.max(...T.map(t=>t.ef));T.forEach(t=>t.lf=end);
+ for(let i=T.length-1;i>=0;i--)T.forEach(u=>{if(u.dep.includes(i))T[i].lf=Math.min(T[i].lf,u.lf-u.dur)});
+ T.forEach(t=>{t.sl=t.lf-t.ef;t.cr=t.sl===0});S.end=end}
+function predict(t){const m=S.team.find(x=>x.n===t.own),days=S.tasks.filter(x=>x.own===t.own).reduce((a,x)=>a+x.dur,0),load=m.l+days*2;
+ const exp=Math.max(0,Math.min(1,(S.today-t.es)/t.dur)),behind=Math.max(0,exp-t.pr/100);
+ const f=[["Long duration",.1*t.dur],["Many dependencies",.3*t.dep.length],["Owner workload "+Math.round(load)+"%",.025*load],["No schedule slack",t.cr?1:0],["Behind expected progress",3*behind],["Skill mismatch",m.s.includes(t.sk)?0:.8]];
+ const z=-3.2+f.reduce((a,x)=>a+x[1],0),p=1/(1+Math.exp(-z));
+ return{p,lv:p>.6?"High":p>.35?"Medium":"Low",f:f.filter(x=>x[1]>.25).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0])}}
+function recs(){const r=[];S.tasks.forEach(t=>{t.r=predict(t);if(t.r.lv==="High"){const alt=S.team.filter(m=>m.n!==t.own&&m.s.includes(t.sk)).sort((a,b)=>a.l-b.l)[0];
+ if(alt)r.push({id:"re"+t.id,tx:"Reassign "+t.name+" from "+t.own+" to "+alt.n,why:"Delay risk "+Math.round(t.r.p*100)+"%. "+alt.n+" has the skill and a lighter load.",do:()=>{t.own=alt.n;t.lock=1}});
+ else r.push({id:"bu"+t.id,tx:"Add a 2-day buffer to "+t.name,why:"Delay risk "+Math.round(t.r.p*100)+"% and no better-suited owner.",do:()=>{t.dur+=2}})}});
+ if(S.end>S.deadline){const c=S.tasks.filter(t=>t.cr).sort((a,b)=>b.dur-a.dur)[0];r.push({id:"dl",tx:"Shorten "+c.name+" by 2 days (add a second person)",why:"Plan ends day "+S.end+", "+(S.end-S.deadline)+" days past the deadline. This task is on the critical path.",do:()=>{c.dur=Math.max(1,c.dur-2)}})}
+ S.recs=r.filter(x=>!S.log.some(l=>l.id===x.id))}
+function calc(){sched();recs();const cost=S.tasks.reduce((a,t)=>a+t.dur*S.rate,0),done=S.tasks.reduce((a,t)=>a+t.pr*t.dur,0)/S.tasks.reduce((a,t)=>a+t.dur,0);return{cost,done:Math.round(done),od:S.tasks.filter(t=>t.ef<=S.today&&t.pr<100).length,hi:S.tasks.filter(t=>t.r.lv==="High").length}}
+function tabs(){const n=[["plan","Plan"],["dash","Dashboard"],["risk","Risks"],["team","Team"],["ai","Responsible AI"]];
+ $("#nav").innerHTML=n.map(x=>`<button class="${S.tab===x[0]?"on":""}" onclick="S.tab='${x[0]}';draw()">${x[1]}</button>`).join("")}
+function inp(){return`<div class="c"><h2>Project details</h2><div class="g">
+<label>Name<input id="n" value="${esc(S.name)}"></label><label>Deadline (day)<input id="dl" type="number" value="${S.deadline}"></label>
+<label>Budget<input id="bg" type="number" value="${S.budget}"></label><label>Cost per person-day<input id="rt" type="number" value="${S.rate}"></label></div>
+<label style="margin-top:10px">Describe the project<textarea id="ds">${esc(S.desc)}</textarea></label>
+<p><button class="p" onclick="gen()">Generate plan</button> <span class="mt">Builds tasks, dependencies, owners and a schedule.</span></p></div>`}
+function gen(){S.name=$("#n").value;S.deadline=+$("#dl").value||30;S.budget=+$("#bg").value||0;S.rate=+$("#rt").value||0;S.desc=$("#ds").value;plan();S.tab="dash";draw()}
+function gantt(){const sc=Math.max(S.end,S.deadline)+2;return`<div class="sc"><div class="gt">${S.tasks.map(t=>`<div class="gr"><div class="gl">${esc(t.name)}</div><div class="gb"><div class="bar ${t.cr?"cr":""}" style="left:${t.es/sc*100}%;width:${t.dur/sc*100}%"><i style="width:${t.pr}%"></i></div>
+<div class="td" style="left:${S.today/sc*100}%"></div></div></div>`).join("")}</div></div><p class="mt">Red bars are the critical path. Orange line is today (day ${S.today}). Darker fill shows progress.</p>`}
+function view(){const k=calc();let h="";
+ if(S.tab==="plan")h=inp()+(S.tasks.length?"":`<div class="c">No plan yet. Describe your project above and select Generate plan.</div>`);
+ if(S.tab!=="plan"&&!S.tasks.length)return`<div class="c">Generate a plan first on the Plan tab.</div>`;
+ if(S.tab==="dash")h=`<div class="g"><div class="c k"><b>${k.done}%</b><span>complete</span></div><div class="c k"><b>Day ${S.end}</b><span>forecast finish (deadline ${S.deadline})</span></div><div class="c k"><b>${Math.round(k.cost/1000*10)/10}k / ${Math.round(S.budget/1000*10)/10}k</b><span>planned cost vs budget</span></div><div class="c k"><b>${k.od}</b><span>overdue tasks</span></div><div class="c k"><b>${k.hi}</b><span>high-risk tasks</span></div></div>
+ <div class="c"><h2>${esc(S.name)}: schedule</h2>${gantt()}<label style="margin-top:8px">Today: day ${S.today}<input type="range" min="0" max="${S.end}" value="${S.today}" oninput="S.today=+this.value;draw()"></label></div>
+ <div class="c"><h2>AI project manager: recommended actions</h2>${S.recs.length?S.recs.map((r,i)=>`<div class="rec"><div>${esc(r.tx)}<small>${esc(r.why)}</small></div><div style="white-space:nowrap"><button class="s" onclick="act(${i},1)">Approve</button> <button class="s" onclick="act(${i},0)">Reject</button></div></div>`).join(""):`<span class="mt">No actions needed right now. Move the day slider or update progress to re-check.</span>`}</div>`;
+ if(S.tab==="risk")h=`<div class="c"><h2>Task risk and progress</h2><div class="sc"><table><tr><th>Task</th><th>Owner</th><th>Days</th><th>Slack</th><th>Progress</th><th>Delay risk</th><th>Main factors</th></tr>${S.tasks.map(t=>`<tr><td>${esc(t.name)}</td><td>${t.own}</td><td>${t.dur}</td><td>${t.sl}</td><td><input type="range" min="0" max="100" step="10" value="${t.pr}" style="width:90px" aria-label="Progress ${esc(t.name)}" onchange="S.tasks[${t.id}].pr=+this.value;draw()"> ${t.pr}%</td><td><span class="b ${t.r.lv}">${t.r.lv} ${Math.round(t.r.p*100)}%</span></td><td class="mt">${t.r.f.join(", ")||"None significant"}</td></tr>`).join("")}</table></div></div>`;
+ if(S.tab==="team"){const ld=S.team.map(m=>({m,d:S.tasks.filter(t=>t.own===t.own&&t.own===m.n).reduce((a,t)=>a+t.dur,0)}));
+ h=`<div class="c"><h2>Workload and skills</h2>${ld.map(x=>`<div class="rec"><div><b>${x.m.n}</b><small>Skills: ${x.m.s.join(", ")}. Tasks: ${S.tasks.filter(t=>t.own===x.m.n).map(t=>esc(t.name)).join(", ")||"none"}</small></div><div>${x.d} days</div></div>`).join("")}<p class="mt">Owners are chosen by skill match first, then lowest current load.</p></div>`}
+ if(S.tab==="ai")h=`<div class="c"><h2>How these recommendations are made</h2><ul><li><b>Planning:</b> tasks come from a template matched to your description. They are a starting point, so edit them.</li><li><b>Scheduling:</b> forward and backward pass over task dependencies to find slack and the critical path.</li><li><b>Delay prediction:</b> a logistic score using duration, dependencies, owner workload, slack, skill match and progress against schedule. The weights here are hand-set for the demo, not trained on real data.</li><li><b>Human approval:</b> no change is applied until you approve it.</li><li><b>Privacy:</b> everything runs in your browser. Nothing is sent anywhere.</li></ul></div>
+ <div class="c"><h2>Decision log</h2>${S.log.length?S.log.map(l=>`<div class="rec"><div>${esc(l.tx)}</div><div>${l.ok?"Approved":"Rejected"}</div></div>`).join(""):`<span class="mt">No decisions yet.</span>`}</div>`;
+ return h}
+function act(i,ok){const r=S.recs[i];if(ok)r.do();S.log.push({id:r.id,tx:r.tx,ok});draw()}
+function draw(){tabs();if(S.tasks.length)calc();$("#v").innerHTML=view()}
+plan();draw();
+</script></body></html>
