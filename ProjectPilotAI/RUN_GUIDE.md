@@ -132,11 +132,11 @@ What gets created:
 - Tasks that were already 100% complete are created as completed.
 
 ### 6.4 Keep both sides in sync
-After you approve recommendations or update progress, the Asana tab shows a **Keep in sync** section:
-- **Push schedule, owners and progress** updates every linked task in Asana: new dates, new assignee, and completion.
-- **Pull completion from Asana** reads Asana and updates ProjectPilot: tasks checked off in Asana become 100% complete, and tasks you reopened go back to 0%. Risks and forecasts recalculate.
+To connect a plan you already generated to an existing Asana project, select **Load projects**, choose the project, then choose **Link current plan to selected Asana project**. Task names are matched without regard to capitalization. Duplicate names are linked only when completion status identifies one clear match; otherwise they are left unlinked with a warning. The Asana tab shows the **Keep in sync** section once a project is linked:
+- **Automatic task-completion sync** is on by default. Completion changes in ProjectPilot are sent to Asana, and Asana is checked every 15 seconds for completion changes. Turn the toggle off to pause automatic syncing.
+- **Push schedule, owners and progress** updates linked tasks in Asana: dates, assignees, and completion. **Pull completion from Asana** manually reads task completion into ProjectPilot. Reopened tasks return to 0%, and risks and forecasts recalculate.
 
-Sync works only for the project created or imported in the current session. Pressing **Generate plan** in the sidebar creates a new plan and breaks the link to Asana, so push before regenerating.
+Connecting a token gives ProjectPilot access to Asana, but does not link a plan. Create a project from the plan or import the matching Asana project first. Sync works only for the project created or imported in the current session. Pressing **Generate plan** in the sidebar creates a new plan and breaks the link to Asana.
 
 ### 6.5 Import an existing Asana project
 1. In the Asana tab, right column, select **Load projects**.

@@ -76,8 +76,11 @@ class Asana:
     # ---- low level ----
     def _req(self, method, path, params=None, body=None, retries=3):
         for attempt in range(retries + 1):
-            r = self.s.request(method, BASE + path, params=params,
-                               json={"data": body} if body is not None else None, timeout=30)
+            try:
+                r = self.s.request(method, BASE + path, params=params,
+                                   json={"data": body} if body is not None else None, timeout=30)
+            except requests.RequestException as e:
+                raise AsanaError(f"Asana request failed: {e}") from e
             if r.status_code == 429 and attempt < retries:        # rate limited
                 time.sleep(min(int(r.headers.get("Retry-After", 2)), 30))
                 continue
@@ -111,6 +114,60 @@ class Asana:
 
     def projects(self, workspace_gid):
         return self._list("/projects", {"workspace": workspace_gid, "archived": "false", "opt_fields": "name"})
+
+    def link_project(self, p: dict, project_gid: str):
+        """Link uniquely named ProjectPilot tasks to tasks in an existing Asana project."""
+        raw = self._list(f"/projects/{project_gid}/tasks", {"opt_fields": "name,completed"})
+        remote = {}
+        for task in raw:
+            key = " ".join(task.get("name", "").casefold().split())
+            remote.setdefault(key, []).append(task)
+        local = {}
+        for task in p["tasks"]:
+            key = " ".join(task.get("name", "").casefold().split())
+            local.setdefault(key, []).append(task)
+
+        remote_by_gid = {task["gid"]: task for task in raw}
+        linked, warnings = 0, []
+        for key, tasks in local.items():
+            group_linked = 0
+            for task in tasks:
+                existing = remote_by_gid.get(task.get("gid"))
+                candidates = remote.get(key, [])
+                if existing:
+                    match = existing
+                elif len(tasks) == 1 and len(candidates) == 1:
+                    match = candidates[0]
+                    task["gid"] = match["gid"]
+                elif len(tasks) == 1 and len(candidates) > 1:
+                    is_complete = task["progress"] >= 100
+                    status_matches = [candidate for candidate in candidates
+                                      if bool(candidate.get("completed")) == is_complete]
+                    if len(status_matches) == 1:
+                        match = status_matches[0]
+                        task["gid"] = match["gid"]
+                        warnings.append(
+                            f"'{task['name']}' had duplicate names; linked the unique Asana task with matching completion status."
+                        )
+                    else:
+                        match = None
+                else:
+                    match = None
+                if match:
+                    if match.get("completed"):
+                        task["progress"] = 100
+                    elif task["progress"] >= 100:
+                        task["progress"] = 0
+                    linked += 1
+                    group_linked += 1
+            if group_linked < len(tasks):
+                if not remote.get(key):
+                    warnings.append(f"No Asana task matches '{tasks[0]['name']}'.")
+                elif len(tasks) != 1 or len(remote[key]) != 1:
+                    warnings.append(f"'{tasks[0]['name']}' is duplicated; those tasks were not linked by name.")
+
+        p["asana"] = {"project_gid": project_gid}
+        return {"linked": linked, "total": len(p["tasks"]), "warnings": warnings}
 
     # ---- ProjectPilot -> Asana ----
     def export_plan(self, p: dict, name: str, workspace: str, start: dt.date, team: str | None = None):
@@ -147,8 +204,7 @@ class Asana:
         email = next((m.get("email") for m in p["team"] if m["name"] == t["owner"]), None)
         if email:
             b["assignee"] = email
-        if t.get("progress", 0) >= 100:
-            b["completed"] = True
+        b["completed"] = t.get("progress", 0) >= 100
         return b
 
     def _create_task(self, b, t, warnings):
@@ -179,6 +235,9 @@ class Asana:
                 self._req("PUT", f"/tasks/{t['gid']}", None, b)
             n += 1
         return {"updated": n, "warnings": warnings}
+
+    def set_task_completion(self, task_gid: str, completed: bool):
+        self._req("PUT", f"/tasks/{task_gid}", None, {"completed": bool(completed)})
 
     def pull_progress(self, p: dict):
         """Mark tasks complete (or reopen them) to match Asana. Returns number changed."""

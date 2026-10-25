@@ -51,11 +51,16 @@ with st.sidebar:
 def launch():
     st.session_state.p = agent.analyse(agent.build(desc, team_from_df(team_df), int(deadline), float(budget)))
     st.session_state.name = name
+    st.session_state["_asana_reset_progress_widgets"] = True
 
 
 if go or st.session_state.get("p") is None:
     launch()
 p = st.session_state.p
+if st.session_state.pop("_asana_reset_progress_widgets", False):
+    for i, task in enumerate(p["tasks"]):
+        st.session_state[f"pg{i}"] = int(task["progress"])
+    st.session_state.pop(f"risk-table-{id(p)}", None)
 MET = metrics()
 best = MET["results"][MET["best_model"]]
 
@@ -100,12 +105,36 @@ def dep_graph(p):
     L = ['digraph G{rankdir=LR;bgcolor="transparent";nodesep=.35;ranksep=.5;node[shape=box,style="rounded,filled",fontname="Helvetica",'
          'fontsize=11,fontcolor="#e6edf7",fillcolor="#111a2b"];edge[color="#4b5f80",arrowsize=.7];']
     for i, t in enumerate(p["tasks"]):
-        L.append(f'n{i}[label="{q(t["name"])}\\n{q(t["owner"])} · {t["duration"]}d",color="{ui.COL[t["level"]]}",penwidth={2.6 if t["critical"] else 1}];')
+        complete = t["progress"] >= 100
+        status = "\\nComplete" if complete else ""
+        fill = "#14532d" if complete else "#111a2b"
+        L.append(f'n{i}[label="{q(t["name"])}\\n{q(t["owner"])} · {t["duration"]}d{status}",fillcolor="{fill}",color="{ui.COL[t["level"]]}",penwidth={2.6 if t["critical"] else 1}];')
     for i, t in enumerate(p["tasks"]):
         for d in t["deps"]:
-            hot = t["critical"] and p["tasks"][d]["critical"]
+            hot = (t.get("path_selected", t["critical"])
+                   and p["tasks"][d].get("path_selected", p["tasks"][d]["critical"]))
             L.append(f'n{d}->n{i}[color="{"#fb7185" if hot else "#4b5f80"}",penwidth={2.4 if hot else 1}];')
     return "".join(L) + "}"
+
+
+@st.fragment(run_every="15s")
+def automatic_asana_completion_sync():
+    if not st.session_state.get("asana_auto_sync", True):
+        return
+    current = st.session_state.get("p")
+    token = st.session_state.get("asana_token")
+    if not current or not current.get("asana") or not token:
+        return
+    try:
+        changed = asana_client.Asana(token).pull_progress(current)
+        if changed:
+            agent.analyse(current)
+            st.session_state.p = current
+            st.session_state["_asana_reset_progress_widgets"] = True
+            st.session_state["_asana_sync_notice"] = f"Pulled {changed} task completion update(s) from Asana."
+            st.rerun()
+    except asana_client.AsanaError as e:
+        st.error(f"Automatic Asana sync failed: {e}")
 
 
 # ---------------------------------------------------------------- mission control
@@ -157,19 +186,42 @@ with t_risk:
     with st.container(key="panel-prog"):
         ui.head("Update progress", "Drag a slider as work completes. Risks and recommendations recalculate.")
         cols = st.columns(3)
+        completion_changes = []
         for i, t in enumerate(p["tasks"]):
-            t["progress"] = cols[i % 3].slider(f"{t['name']} ({t['owner']})", 0, 100, t["progress"], 10, key=f"pg{i}")
+            was_complete = t["progress"] >= 100
+            t["progress"] = cols[i % 3].slider(
+                f"{t['name']} ({t['owner']})", min_value=0, max_value=100, step=10, key=f"pg{i}"
+            )
+            if was_complete != (t["progress"] >= 100) and t.get("gid"):
+                completion_changes.append((t["gid"], t["progress"] >= 100))
+        if (completion_changes and p.get("asana") and st.session_state.get("asana_auto_sync", True)
+                and st.session_state.get("asana_token")):
+            try:
+                cl = asana_client.Asana(st.session_state.asana_token)
+                for gid, completed in completion_changes:
+                    cl.set_task_completion(gid, completed)
+                st.caption("Task completion synced to Asana.")
+            except asana_client.AsanaError as e:
+                st.warning(f"Automatic Asana sync failed: {e}")
     agent.analyse(p)
     with st.container(key="panel-table"):
-        ui.head("Task risk table", "Risk factors come from the model's explainer, not a black box.")
-        st.dataframe(pd.DataFrame([{"Task": t["name"], "Owner": t["owner"], "Days": t["duration"], "Slack": t["slack"],
-                                    "Critical": t["critical"], "Delay risk": round(t["risk"] * 100), "Level": t["level"],
-                                    "Main factors": ", ".join(t["factors"]) or "None significant"} for t in p["tasks"]]),
-                     hide_index=True, width="stretch",
-                     column_config={"Delay risk": st.column_config.ProgressColumn("Delay risk", min_value=0, max_value=100, format="%d%%"),
-                                    "Critical": st.column_config.CheckboxColumn("Critical path")})
+        ui.head("Task risk table", "Complete reflects task progress from ProjectPilot or Asana. Critical path boxes highlight connecting arrows.")
+        for t in p["tasks"]:
+            t.setdefault("path_selected", t["critical"])
+        risk_table = pd.DataFrame([{"Task": t["name"], "Owner": t["owner"], "Days": t["duration"], "Slack": t["slack"],
+                                    "Complete": t["progress"] >= 100, "Critical": t["path_selected"],
+                                    "Delay risk": round(t["risk"] * 100), "Level": t["level"],
+                                    "Main factors": ", ".join(t["factors"]) or "None significant"} for t in p["tasks"]])
+        edited_table = st.data_editor(
+            risk_table, hide_index=True, width="stretch", key=f"risk-table-{id(p)}",
+            disabled=["Task", "Owner", "Days", "Slack", "Complete", "Delay risk", "Level", "Main factors"],
+            column_config={"Delay risk": st.column_config.ProgressColumn("Delay risk", min_value=0, max_value=100, format="%d%%"),
+                           "Complete": st.column_config.CheckboxColumn("Complete"),
+                           "Critical": st.column_config.CheckboxColumn("Critical path")})
+        for t, selected in zip(p["tasks"], edited_table["Critical"]):
+            t["path_selected"] = bool(selected)
     with st.container(key="panel-graph"):
-        ui.head("Dependency network", "Box colour = delay risk. Thick red path = critical path.")
+        ui.head("Dependency network", "Green fill = complete. Outline colour = delay risk. Red arrows connect selected critical-path tasks.")
         st.graphviz_chart(dep_graph(p))
 
 # ---------------------------------------------------------------- forecast
@@ -248,6 +300,11 @@ with t_asana:
         except Exception as e:
             st.error(str(e))
     ws_list = st.session_state.get("asana_ws")
+    notice = st.session_state.pop("_asana_sync_notice", None)
+    if notice:
+        st.success(notice)
+    for warning in st.session_state.pop("_asana_link_warnings", []):
+        st.warning(warning)
     if ws_list:
         try:
             cl = asana_client.Asana(st.session_state.asana_token)
@@ -269,15 +326,29 @@ with t_asana:
                         st.warning(w)
                 if p is not None and p.get("asana"):
                     st.markdown("**Keep in sync**")
-                    if st.button("Push schedule, owners and progress"):
+                    st.toggle("Automatic task-completion sync (checks Asana every 15 seconds)",
+                              value=True, key="asana_auto_sync")
+                    linked_count = sum(bool(t.get("gid")) for t in p["tasks"])
+                    if not linked_count:
+                        st.warning("This plan has no linked Asana tasks. Create a project or import its tasks to enable sync.")
+                    else:
+                        st.caption(f"{linked_count} of {len(p['tasks'])} tasks linked to Asana.")
+                        automatic_asana_completion_sync()
+                    if st.button("Push schedule, owners and progress", disabled=not linked_count):
                         r = cl.push_updates(p, start)
                         st.success(f"Updated {r['updated']} tasks in Asana.")
                         for w in r["warnings"]:
                             st.warning(w)
-                    if st.button("Pull completion from Asana"):
+                    if st.button("Pull completion from Asana", disabled=not linked_count):
                         n = cl.pull_progress(p)
                         agent.analyse(p)
-                        st.success(f"{n} tasks changed.")
+                        if n:
+                            st.session_state["_asana_reset_progress_widgets"] = True
+                            st.session_state["_asana_sync_notice"] = f"Pulled {n} task completion update(s) from Asana."
+                            st.rerun()
+                        st.success("ProjectPilot is already up to date with Asana.")
+                elif p is not None:
+                    st.info("Connecting your token grants access. Create or import an Asana project to link this plan for syncing.")
             with right:
                 st.markdown("**Import an Asana project**")
                 if st.button("Load projects"):
@@ -285,6 +356,16 @@ with t_asana:
                 projs = st.session_state.get("asana_projects")
                 if projs:
                     pr = st.selectbox("Project", projs, format_func=lambda x: x["name"])
+                    if p is not None and st.button("Link current plan to selected Asana project"):
+                        result = cl.link_project(p, pr["gid"])
+                        agent.analyse(p)
+                        st.session_state.p = p
+                        st.session_state["_asana_reset_progress_widgets"] = True
+                        st.session_state["_asana_sync_notice"] = (
+                            f"Linked {result['linked']} of {result['total']} tasks to Asana."
+                        )
+                        st.session_state["_asana_link_warnings"] = result["warnings"]
+                        st.rerun()
                     dl = st.number_input("Deadline (day) for imported project", 5, 365, 40, key="imp_dl")
                     bg = st.number_input("Budget", 0, 10_000_000, 30000, step=1000, key="imp_bg")
                     if st.button("Import into ProjectPilot"):
@@ -294,6 +375,7 @@ with t_asana:
                         proj["asana"] = {"project_gid": pr["gid"], "url": None}
                         st.session_state.p = agent.analyse(proj)
                         st.session_state.name = nm
+                        st.session_state["_asana_reset_progress_widgets"] = True
                         st.rerun()
         except asana_client.AsanaError as e:
             st.error(str(e))

@@ -46,7 +46,7 @@ Open the **Asana** tab in the app.
 2. Optional: add each teammate's Asana email in the sidebar team table so tasks are assigned to them.
 3. **Send plan to Asana** creates a project with tasks, start/due dates from the critical-path schedule, risk notes and dependencies.
 4. **Import an Asana project** loads its tasks, dates, assignees and dependencies into ProjectPilot for risk analysis.
-5. After approving recommendations, **Push schedule, owners and progress** updates the Asana tasks, and **Pull completion from Asana** brings checked-off tasks back.
+5. To sync an existing project with a generated plan, load projects, select the Asana project, and choose **Link current plan to selected Asana project**. Automatic completion sync pushes completion changes from ProjectPilot and checks Asana every 15 seconds. Turn it off in **Keep in sync** to pause it. Manual push and pull remain available.
 
 Notes: task dependencies need an Asana plan that supports them (you get a warning if not). Organization workspaces require choosing a team. Imported durations come from start/due dates (3 days if missing) and skills are guessed from task names. The integration is covered by mocked tests; it has not been run against a live Asana account.
 
